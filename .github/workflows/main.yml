@@ -6,14 +6,14 @@ on:
 jobs:
   secure-rdp:
     runs-on: windows-latest
-    timeout-minutes: 350
+    timeout-minutes: 2
 
     steps:
 
 
 
       # =====================
-      # 2. Install Apps (only if missing)
+      # 1. Install Apps (only if missing)
       # =====================
       - name: Install Brave
         run: |
@@ -127,17 +127,50 @@ jobs:
           Write-Host "Username: RDP"
           Write-Host "Password: $(echo $env:RDP_CREDS)"
           Write-Host "==================`n"
-         
+
+          # Prepare values
+          $rdpAddress = $env:TAILSCALE_IP
+          $rdpUser = "RDP"
+          $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
+
+
+          # Send email with RDP credentials
+          $smtpServer = "smtp.gmail.com"
+          $smtpPort = 587
+          $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
+          $smtpPass = "${{ secrets.EMAIL_SMTP_PASS }}"
+          $emailFrom = "${{ secrets.EMAIL_FROM }}"
+          $emailTo = "${{ secrets.EMAIL_TO }}"
+          $subject = "RDP Access Credentials"
+
+
+          $body = @"
+          === RDP ACCESS ===
+          Address: $rdpAddress
+          Username: $rdpUser
+          Password: $rdpPassword
+          ===================
+          "@
+
+          # Create SMTP client and send email
+          $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
+          $smtpClient.EnableSsl = $true
+          $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
+
+          $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
+          $smtpClient.Send($mailMessage)
+
           # Keep runner active indefinitely (or until manually cancelled)
           while ($true) {
               Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
               Start-Sleep -Seconds 300
           }
+         
 
       - name: Restart Workflow Before Timeout
         if: always()
         run: |
-          echo "Re-triggering workflow before 6h limit..."
+          echo "Re-triggering workflow before timeout..."
           gh workflow run RDP.yml --repo "$GITHUB_REPOSITORY"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
