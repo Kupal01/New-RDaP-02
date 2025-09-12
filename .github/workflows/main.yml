@@ -109,6 +109,7 @@ jobs:
           $smtpClient.EnableSsl = $true
           $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
           $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
+          Write-Host "Sending email from $emailFrom to $emailTo using $smtpServer..."
           $smtpClient.Send($mailMessage)
           while ($true) {
               Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
