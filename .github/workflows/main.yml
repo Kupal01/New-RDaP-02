@@ -6,7 +6,7 @@ on:
 jobs:
   secure-rdp:
     runs-on: windows-latest
-    timeout-minutes: 4320
+    timeout-minutes: 350
 
     steps:
 
@@ -134,11 +134,11 @@ jobs:
               Start-Sleep -Seconds 300
           }
 
-      - name: Restart Workflow After Timeout
+      - name: Restart Workflow Before Timeout
         if: always()
         run: |
-          echo "Re-triggering this workflow..."
-          gh workflow run RDP.yml -R $GITHUB_REPOSITORY
+          echo "Re-triggering workflow before 6h limit..."
+          gh workflow run RDP.yml --repo "$GITHUB_REPOSITORY"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
