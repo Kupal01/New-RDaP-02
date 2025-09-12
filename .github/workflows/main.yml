@@ -60,14 +60,17 @@ jobs:
             Start-Process tor_installer.exe -ArgumentList "/S" -Wait
           }
 
-      - name: Configure Core RDP Settings
+      # =======================
+      # 2. Configure Core RDP Settings (Run as Admin)
+      # =======================
+      - name: Configure Core RDP Settings with Admin Privileges
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
-          netsh advfirewall firewall delete rule name="RDP-Tailscale"
-          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
-          Restart-Service -Name TermService -Force
+          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0 -Force" -Verb RunAs
+          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'UserAuthentication' -Value 0 -Force" -Verb RunAs
+          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'SecurityLayer' -Value 0 -Force" -Verb RunAs
+          Start-Process powershell -ArgumentList "-Command netsh advfirewall firewall delete rule name='RDP-Tailscale'" -Verb RunAs
+          Start-Process powershell -ArgumentList "-Command netsh advfirewall firewall add rule name='RDP-Tailscale' dir=in action=allow protocol=TCP localport=3389" -Verb RunAs
+          Start-Process powershell -ArgumentList "-Command Restart-Service -Name TermService -Force" -Verb RunAs
 
           # =====================
           # 3. Set Profile Picture
