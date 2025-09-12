@@ -45,6 +45,13 @@ jobs:
             Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
             Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
+      - name: Check if Brave is installed
+        run: |
+          if (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe") {
+              Write-Host "Brave installed successfully."
+          } else {
+              Write-Error "Brave installation failed."
+          }
 
       - name: Install Tor Browser
         run: |
@@ -117,8 +124,8 @@ jobs:
           $password = -join ($rawPassword | Sort-Object { Get-Random })
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
+          Add-LocalGroupMember -Group "Administrators" -Member "KUPAL"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "KUPAL"
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
       - name: Install Tailscale
@@ -158,8 +165,43 @@ jobs:
       - name: Maintain Connection and Send Email
         run: |
           $rdpAddress = $env:TAILSCALE_IP
-          $rdpUser = "RDP"
+          $rdpUser = "KUPAL"
           $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
+      - name: Mask Sensitive Information
+        run: |
+          echo "::add-mask::$env:TAILSCALE_IP"
+          echo "::add-mask::$env:RDP_CREDS"
+
+
+          # Enhance email body with more information
+          $body = @"
+          <html>
+          <body>
+          <h2>RDP Access Details</h2>
+          <p><strong>Address:</strong> $rdpAddress</p>
+          <p><strong>Username:</strong> $rdpUser</p>
+          <p><strong>Password:</strong> $rdpPassword</p>
+
+          <p><strong>System Information:</strong></p>
+          <ul>
+              <li><strong>OS:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).Caption</li>
+              <li><strong>OS Version:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).Version</li>
+              <li><strong>Architecture:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).OSArchitecture</li>
+              <li><strong>Host Name:</strong> $(hostname)</li>
+          </ul>
+
+          <p><strong>Installed Applications:</strong></p>
+          <ul>
+              <li>Brave Browser (Installed: $(if (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe") { "Yes" } else { "No" }))</li>
+              <li>Tor Browser (Installed: $(if (Test-Path "C:\Program Files\Tor Browser\Browser\firefox.exe") { "Yes" } else { "No" }))</li>
+          </ul>
+
+          <p><strong>Time of Setup:</strong> $(Get-Date)</p>
+
+          </body>
+          </html>
+          "@
+
           # Email setup
           $smtpServer = "smtp.gmail.com"
           $smtpPort = 587
