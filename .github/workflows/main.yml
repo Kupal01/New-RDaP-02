@@ -61,26 +61,7 @@ jobs:
             Start-Process tor_installer.exe -ArgumentList "/S" -Wait
           }
 
-      - name: Install Android Studio
-        run: |
-          if (-not (Test-Path "C:\Program Files\Android\Android Studio\bin\studio64.exe")) {
-            Invoke-WebRequest -Uri "https://redirector.gvt1.com/edgedl/android/studio/install/2024.2.1.9/android-studio-2024.2.1.9-windows.exe" -OutFile as_installer.exe
-            Start-Process as_installer.exe -ArgumentList "/S" -Wait
-          }
-
-      - name: Install Qoder
-        run: |
-          if (-not (Test-Path "C:\Program Files\Qoder\Qoder.exe")) {
-          Invoke-WebRequest -Uri "https://download.qoder.com/release/latest/QoderUserSetup-x64.exe" -OutFile qoder_installer.exe
-            Start-Process qoder_installer.exe -ArgumentList "/silent", "/install" -Wait
-          }
-
-      - name: Install Cursor AI
-        run: |
-          if (-not (Test-Path "C:\Program Files\Cursor\Cursor.exe")) {
-            Invoke-WebRequest -Uri "https://downloads.cursor.com/production/2f2737de9aa376933d975ae30290447c910fdf46/win32/x64/user-setup/CursorUserSetup-x64-1.5.11.exe" -OutFile cursor_installer.exe
-            Start-Process cursor_installer.exe -ArgumentList "/S" -Wait
-          }
+      
 
       - name: Configure Core RDP Settings
         run: |
