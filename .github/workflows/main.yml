@@ -62,6 +62,44 @@ jobs:
           netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
+          # =====================
+          # 3. Set Profile Picture
+          # =====================
+          - name: Set Profile Picture for RDP User
+            run: |
+              $profilePicUrl = "https://i.pinimg.com/736x/16/ef/4b/16ef4bfc055b16a4b165fa2d06327e78.jpg"  # Your image URL
+              $profilePicPath = "C:\Users\$env:USERNAME\Pictures\userProfilePic.jpg"
+          
+              # Download the profile picture
+              Invoke-WebRequest -Uri $profilePicUrl -OutFile $profilePicPath
+          
+              # Set the downloaded image as the profile picture
+              $pictureFolder = "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\AccountPictures"
+              if (-not (Test-Path $pictureFolder)) {
+                  New-Item -Path $pictureFolder -ItemType Directory
+              }
+          
+              # Copy the image to the AccountPictures folder
+              Copy-Item -Path $profilePicPath -Destination "$pictureFolder\user.png" -Force
+          
+              # Update the registry to set the picture
+              $regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\AccountPicture"
+              Set-ItemProperty -Path $regKey -Name "ImagePath" -Value "$pictureFolder\user.png"
+      # =====================
+      # 4. Set Dark Mode
+      # =====================
+      - name: Set Windows Dark Mode
+        run: |
+          # Set Dark Mode (Registry key change)
+          $darkModeKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+          Set-ItemProperty -Path $darkModeKey -Name "AppsUseLightTheme" -Value 0  # 0 for dark, 1 for light
+      
+          # Optionally set system to dark mode as well
+          Set-ItemProperty -Path $darkModeKey -Name "SystemUsesLightTheme" -Value 0  # 0 for dark, 1 for light
+      
+          Write-Host "Windows is now set to Dark Mode"
+                
+
       - name: Create RDP User with Secure Password
         run: |
           Add-Type -AssemblyName System.Security
