@@ -57,7 +57,7 @@ jobs:
       - name: Install Tor Browser
         run: |
           if (-not (Test-Path "C:\Program Files\Tor Browser\Browser\firefox.exe")) {
-            Invoke-WebRequest -Uri "https://www.torproject.org/dist/torbrowser/14.5.6/tor-browser-windows-x86_64-portable-14.5.6.exe" -OutFile tor_installer.exe
+            Invoke-WebRequest -Uri "https://www.torproject.org/dist/torbrowser/14.5.6/tor-browser-windows-x86_64-portable-14.5.6.exe" -OutFile tor_installer.exe"
             Start-Process tor_installer.exe -ArgumentList "/S" -Wait
           }
 
