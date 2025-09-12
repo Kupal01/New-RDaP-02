@@ -11,30 +11,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-   # ===========================
-      # 1. Create Folder on Desktop
-      # ===========================
-      - name: Create Folder on Desktop
-        run: |
-          $desktopPath = [System.Environment]::GetFolderPath('Desktop')
-          $repoFolderPath = "$desktopPath\Repo"
-          if (-not (Test-Path $repoFolderPath)) {
-              New-Item -Path $repoFolderPath -ItemType Directory
-              Write-Host "Folder created at $repoFolderPath"
-          } else {
-              Write-Host "Folder already exists."
-          }
-
-      # ===========================
-      # 2. Cache the Repo Folder
-      # ===========================
-      - name: Cache Repo Folder
-        uses: actions/cache@v3
-        with:
-          path: C:\Users\${{ runner.os }}\Desktop\Repo
-          key: repo-folder-${{ runner.os }}-${{ hashFiles('**/Repo/**') }}
-          restore-keys: |
-            repo-folder-${{ runner.os }}-
 
       # =====================
       # 1. Install Apps (only if missing)
@@ -45,13 +21,6 @@ jobs:
             Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
             Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
-      - name: Check if Brave is installed
-        run: |
-          if (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe") {
-              Write-Host "Brave installed successfully."
-          } else {
-              Write-Error "Brave installation failed."
-          }
 
       - name: Install Tor Browser
         run: |
@@ -60,55 +29,14 @@ jobs:
             Start-Process tor_installer.exe -ArgumentList "/S" -Wait
           }
 
-      # =======================
-      # 2. Configure Core RDP Settings (Run as Admin)
-      # =======================
-      - name: Configure Core RDP Settings with Admin Privileges
+      - name: Configure Core RDP Settings
         run: |
-          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0 -Force" -Verb RunAs
-          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'UserAuthentication' -Value 0 -Force" -Verb RunAs
-          Start-Process powershell -ArgumentList "-Command Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'SecurityLayer' -Value 0 -Force" -Verb RunAs
-          Start-Process powershell -ArgumentList "-Command netsh advfirewall firewall delete rule name='RDP-Tailscale'" -Verb RunAs
-          Start-Process powershell -ArgumentList "-Command netsh advfirewall firewall add rule name='RDP-Tailscale' dir=in action=allow protocol=TCP localport=3389" -Verb RunAs
-          Start-Process powershell -ArgumentList "-Command Restart-Service -Name TermService -Force" -Verb RunAs
-
-          # =====================
-          # 3. Set Profile Picture
-          # =====================
-          - name: Set Profile Picture for RDP User
-            run: |
-              $profilePicUrl = "https://i.pinimg.com/736x/16/ef/4b/16ef4bfc055b16a4b165fa2d06327e78.jpg"  # Your image URL
-              $profilePicPath = "C:\Users\$env:USERNAME\Pictures\userProfilePic.jpg"
-          
-              # Download the profile picture
-              Invoke-WebRequest -Uri $profilePicUrl -OutFile $profilePicPath
-          
-              # Set the downloaded image as the profile picture
-              $pictureFolder = "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\AccountPictures"
-              if (-not (Test-Path $pictureFolder)) {
-                  New-Item -Path $pictureFolder -ItemType Directory
-              }
-          
-              # Copy the image to the AccountPictures folder
-              Copy-Item -Path $profilePicPath -Destination "$pictureFolder\user.png" -Force
-          
-              # Update the registry to set the picture
-              $regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\AccountPicture"
-              Set-ItemProperty -Path $regKey -Name "ImagePath" -Value "$pictureFolder\user.png"
-      # =====================
-      # 4. Set Dark Mode
-      # =====================
-      - name: Set Windows Dark Mode
-        run: |
-          # Set Dark Mode (Registry key change)
-          $darkModeKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-          Set-ItemProperty -Path $darkModeKey -Name "AppsUseLightTheme" -Value 0  # 0 for dark, 1 for light
-      
-          # Optionally set system to dark mode as well
-          Set-ItemProperty -Path $darkModeKey -Name "SystemUsesLightTheme" -Value 0  # 0 for dark, 1 for light
-      
-          Write-Host "Windows is now set to Dark Mode"
-                
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+          netsh advfirewall firewall delete rule name="RDP-Tailscale"
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+          Restart-Service -Name TermService -Force
 
       - name: Create RDP User with Secure Password
         run: |
@@ -127,8 +55,8 @@ jobs:
           $password = -join ($rawPassword | Sort-Object { Get-Random })
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "KUPAL"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "KUPAL"
+          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
       - name: Install Tailscale
@@ -168,43 +96,8 @@ jobs:
       - name: Maintain Connection and Send Email
         run: |
           $rdpAddress = $env:TAILSCALE_IP
-          $rdpUser = "KUPAL"
+          $rdpUser = "RDP"
           $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
-      - name: Mask Sensitive Information
-        run: |
-          echo "::add-mask::$env:TAILSCALE_IP"
-          echo "::add-mask::$env:RDP_CREDS"
-
-
-          # Enhance email body with more information
-          $body = @"
-          <html>
-          <body>
-          <h2>RDP Access Details</h2>
-          <p><strong>Address:</strong> $rdpAddress</p>
-          <p><strong>Username:</strong> $rdpUser</p>
-          <p><strong>Password:</strong> $rdpPassword</p>
-
-          <p><strong>System Information:</strong></p>
-          <ul>
-              <li><strong>OS:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).Caption</li>
-              <li><strong>OS Version:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).Version</li>
-              <li><strong>Architecture:</strong> $(Get-WmiObject -Class Win32_OperatingSystem).OSArchitecture</li>
-              <li><strong>Host Name:</strong> $(hostname)</li>
-          </ul>
-
-          <p><strong>Installed Applications:</strong></p>
-          <ul>
-              <li>Brave Browser (Installed: $(if (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe") { "Yes" } else { "No" }))</li>
-              <li>Tor Browser (Installed: $(if (Test-Path "C:\Program Files\Tor Browser\Browser\firefox.exe") { "Yes" } else { "No" }))</li>
-          </ul>
-
-          <p><strong>Time of Setup:</strong> $(Get-Date)</p>
-
-          </body>
-          </html>
-          "@
-
           # Email setup
           $smtpServer = "smtp.gmail.com"
           $smtpPort = 587
