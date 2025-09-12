@@ -11,6 +11,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+   # ===========================
+      # 1. Create Folder on Desktop
+      # ===========================
+      - name: Create Folder on Desktop
+        run: |
+          $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+          $repoFolderPath = "$desktopPath\Repo"
+          if (-not (Test-Path $repoFolderPath)) {
+              New-Item -Path $repoFolderPath -ItemType Directory
+              Write-Host "Folder created at $repoFolderPath"
+          } else {
+              Write-Host "Folder already exists."
+          }
+
+      # ===========================
+      # 2. Cache the Repo Folder
+      # ===========================
+      - name: Cache Repo Folder
+        uses: actions/cache@v3
+        with:
+          path: C:\Users\${{ runner.os }}\Desktop\Repo
+          key: repo-folder-${{ runner.os }}-${{ hashFiles('**/Repo/**') }}
+          restore-keys: |
+            repo-folder-${{ runner.os }}-
 
       # =====================
       # 1. Install Apps (only if missing)
