@@ -11,38 +11,6 @@ jobs:
     steps:
 
 
-      # =====================
-      # 1. Cache App Folders
-      # =====================
-      - name: Cache Brave
-        uses: actions/cache@v3
-        with:
-          path: 'C:\Program Files\BraveSoftware'
-          key: brave-browser-v1
-
-      - name: Cache Tor
-        uses: actions/cache@v3
-        with:
-          path: 'C:\Program Files\Tor Browser'
-          key: tor-browser-v1
-
-      - name: Cache Android Studio
-        uses: actions/cache@v3
-        with:
-          path: 'C:\Program Files\Android\Android Studio'
-          key: android-studio-v1
-
-      - name: Cache Qoder
-        uses: actions/cache@v3
-        with:
-          path: 'C:\Program Files\Qoder'
-          key: qoder-v1
-
-      - name: Cache Cursor
-        uses: actions/cache@v3
-        with:
-          path: 'C:\Program Files\Cursor'
-          key: cursor-v1
 
       # =====================
       # 2. Install Apps (only if missing)
