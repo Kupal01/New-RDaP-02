@@ -30,17 +30,6 @@ jobs:
               New-Item -ItemType Directory -Path C:\RDPTools
           }
       
-      - name: Define Hash Function
-        run: |
-          @'
-          function Get-Hash($input) {
-              $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
-              $sha = [System.Security.Cryptography.SHA256]::Create()
-              $hash = $sha.ComputeHash($bytes)
-              return [BitConverter]::ToString($hash) -replace "-", ""
-          }
-          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
-         
                 # =====================
       # Added: log input for debugging
       # =====================
@@ -130,8 +119,6 @@ jobs:
           echo "::add-mask::$rdpPassword"
           echo "::add-mask::$currentIP"
           
-          Write-Host "🔒 Starting health check (no sensitive info will be shown in logs)..."
-
           function Send-RdpEmail($ip, $password) {
               $smtpServer = "smtp.gmail.com"
               $smtpPort = 587
@@ -170,11 +157,11 @@ jobs:
               $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
               
               if ($newIP -and $newIP -ne $currentIP) {
-                  Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
+                  Write-Host "🔄 IP changed! "
                   $currentIP = $newIP
                   Send-RdpEmail $currentIP $rdpPassword
               } else {
-                  Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
+                  Write-Host "✅ IP still OK"
               }
           }       
           Write-Host "⏰ Health check window ended — moving to rerun step"
