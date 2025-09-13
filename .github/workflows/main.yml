@@ -20,15 +20,15 @@ jobs:
 
       - name: Define Hash Function
         run: |
+          @'
           function Get-Hash($input) {
               $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
               $sha = [System.Security.Cryptography.SHA256]::Create()
               $hash = $sha.ComputeHash($bytes)
               return [BitConverter]::ToString($hash) -replace "-", ""
           }
-          Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1 -Value ${function:Get-Hash}.ToString()
-
-
+          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
+      
 
 
       # =====================
