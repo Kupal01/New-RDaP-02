@@ -18,6 +18,23 @@ jobs:
         uses: actions/checkout@v3
 
 
+      # 1️⃣ Restore cache if it exists
+      - name: Restore cached RDP files
+        uses: actions/cache@v3
+        with:
+          path: C:\RDPTools
+          key: rdp-tools-v1
+
+      # 2️⃣ Create folder and add your files (only runs if cache empty)
+      - name: Prepare RDP files
+        run: |
+          if (!(Test-Path "C:\RDPTools")) {
+            New-Item -ItemType Directory -Path C:\RDPTools
+          }
+
+
+
+
       - name: Define Hash Function
         run: |
           @'
@@ -49,6 +66,13 @@ jobs:
             Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
             Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
+
+      # 3️⃣ Upload to artifact (so you can download manually anytime)
+      - name: Upload RDP files as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-files
+          path: C:\RDPTools
 
 
       - name: Configure Core RDP Settings
@@ -118,7 +142,7 @@ jobs:
       - name: Maintain Connection and Auto-Notify on IP Change
         run: |
           . $env:GITHUB_WORKSPACE\hash.ps1   # Load Get-Hash function
-
+    
           function Send-RdpEmail($ip, $password) {
               $smtpServer = "smtp.gmail.com"
               $smtpPort = 587
@@ -127,13 +151,20 @@ jobs:
               $emailFrom = "${{ secrets.EMAIL_FROM }}"
               $emailTo = "${{ secrets.EMAIL_TO }}"
               $subject = "RDP Access Credentials (Updated)"
-              $body = "=== RDP ACCESS ===`nAddress: $ip`nUsername: RDP`nPassword: $password`n==================="
+          
+              # ✅ Show recipient in clear text, hash IP + password
+              Write-Host "📧 Sending email to $emailTo (IP hash: $(Get-Hash $ip), Password hash: $(Get-Hash $password))"
+          
               $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
               $smtpClient.EnableSsl = $true
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
+          
+              # You also need to define $body before sending (didn’t see it above)
+              $body = "RDP Access is ready.`nUser: RDP`nPassword: $password`nIP: $ip"
+          
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
-              Write-Host "📧 Email sent (IP hash: $(Get-Hash $ip), Password hash: $(Get-Hash $password))"
+          
           }
 
           $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
