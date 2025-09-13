@@ -85,6 +85,7 @@ jobs:
           Restart-Service -Name TermService -Force
 
       - name: Create RDP User with Secure Password
+        id: creds
         run: |
           Add-Type -AssemblyName System.Security
           $charSet = @{
@@ -103,7 +104,8 @@ jobs:
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
-          echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
+          echo "::add-mask::$password"
+          echo "password=$password" >> $env:GITHUB_OUTPUT
 
       - name: Install Tailscale
         run: |
@@ -114,6 +116,7 @@ jobs:
           Remove-Item $installerPath -Force
 
       - name: Establish Tailscale Connection
+        id: tailscale
         run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
           $tsIP = $null
@@ -127,23 +130,19 @@ jobs:
               Write-Error "Tailscale IP not assigned. Exiting."
               exit 1
           }
-          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+
+          echo "::add-mask::$tsIP"
+          echo "tsip=$tsIP" >> $env:GITHUB_OUTPUT
 
 
       - name: Verify RDP Accessibility
         run: |
-          . $env:GITHUB_WORKSPACE\hash.ps1   # Load Get-Hash function
-          $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
-          if (-not $testResult.TcpTestSucceeded) {
-              Write-Error "❌ TCP connection failed (IP hash: $(Get-Hash $env:TAILSCALE_IP))"
-              exit 1
-          }
-          Write-Host "✅ TCP connectivity successful (IP hash: $(Get-Hash $env:TAILSCALE_IP))"
-      - name: Maintain Connection and Auto-Notify on IP Change
-        run: |
-          . $env:GITHUB_WORKSPACE\hash.ps1   # Load Get-Hash function
-    
-          function Send-RdpEmail($ip, $password) {
+              $rdpPassword = "${{ steps.creds.outputs.password }}"
+              $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
+          
+              Write-Host "🔒 Starting health check (no sensitive info will be shown in logs)..."
+
+               function Send-RdpEmail($ip, $password) {
               $smtpServer = "smtp.gmail.com"
               $smtpPort = 587
               $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
@@ -152,23 +151,28 @@ jobs:
               $emailTo = "${{ secrets.EMAIL_TO }}"
               $subject = "RDP Access Credentials (Updated)"
           
-              # ✅ Show recipient in clear text, hash IP + password
-              Write-Host "📧 Sending email to $emailTo (IP hash: $(Get-Hash $ip), Password hash: $(Get-Hash $password))"
+     
           
               $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
               $smtpClient.EnableSsl = $true
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
           
               # You also need to define $body before sending (didn’t see it above)
-              $body = "RDP Access is ready.`nUser: RDP`nPassword: $password`nIP: $ip"
-          
+                  $body = @"
+              === RDP ACCESS ===
+              Address: $ip
+              Username: RDP
+              Password: $password
+              ==================
+              "@
+
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
           
           }
-
-          $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
-          $currentIP = $env:TAILSCALE_IP
+          $rdpPassword = "${{ steps.creds.outputs.password }}"
+          $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
+          
 
           # Send initial email
           Send-RdpEmail $currentIP $rdpPassword
@@ -188,25 +192,24 @@ jobs:
               } else {
                   Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
               }
-          }
-          Write-Host "⏰ Health check window ended — moving to rerun step"
+          }          Write-Host "⏰ Health check window ended — moving to rerun step"
 
       - name: Trigger Call RDP email rerun
-        if: always()   # run even if previous steps fail
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          run_id=$(gh run list \
-            --workflow "Call RDP email" \
-            --repo "${{ github.repository }}" \
-            --branch "${{ github.ref_name }}" \
-            --limit 1 \
-            --json databaseId \
-            --jq ".[0].databaseId")
+          $run_id = gh run list `
+            --workflow "Call RDP email" `
+            --repo "${{ github.repository }}" `
+            --branch "${{ github.ref_name }}" `
+            --limit 1 `
+            --json databaseId `
+            --jq ".[0].databaseId"
 
-          if [ -n "$run_id" ]; then
-            echo "🔁 Rerunning Call RDP email run ID: $run_id"
+          if ($run_id) {
+            Write-Host "🔁 Rerunning Call RDP email run ID: $run_id"
             gh run rerun $run_id --repo "${{ github.repository }}"
-          else
-            echo "⚠️ No previous Call RDP email run found"
-          fi
+          } else {
+            Write-Host "⚠️ No previous Call RDP email run found"
+          }
