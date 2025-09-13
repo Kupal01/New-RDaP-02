@@ -36,6 +36,7 @@ jobs:
             --jq ".[0].databaseId")
           echo "last_run_id=$run_id" >> "$GITHUB_OUTPUT"
 
+      
       - name: Rerun last RDP email workflow
         if: steps.last_run.outputs.last_run_id != ''
         env:
@@ -43,4 +44,3 @@ jobs:
         run: |
           echo "🔁 Rerunning workflow run ID: ${{ steps.last_run.outputs.last_run_id }}"
           gh run rerun ${{ steps.last_run.outputs.last_run_id }} --repo "${{ github.repository }}"
-
