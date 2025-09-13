@@ -154,12 +154,12 @@ jobs:
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
           
               $body = @"
-=== RDP ACCESS ===
-Address: $ip
-Username: RDP
-Password: $password
-==================
-"@
+          === RDP ACCESS ===
+          Address: $ip
+          Username: RDP
+          Password: $password
+          ==================
+          "@
           
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
