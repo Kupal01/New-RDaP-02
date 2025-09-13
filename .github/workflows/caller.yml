@@ -17,9 +17,9 @@ jobs:
         id: context
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "trigger_type=scheduled" >> $GITHUB_OUTPUT
+            echo "trigger_type=scheduled" >> "$GITHUB_OUTPUT"
           else
-            echo "trigger_type=manual" >> $GITHUB_OUTPUT
+            echo "trigger_type=manual" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Trigger the RDP email workflow
