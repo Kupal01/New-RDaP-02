@@ -1,1 +1,32 @@
+name: Call RDP email
 
+on:
+  workflow_dispatch:    # manual trigger
+  schedule:
+    - cron: "50 */6 * * *"   # every 6 hours at minute 50 (≈ 5h50m cycle, UTC)
+
+permissions:
+  workflows: write
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide trigger type
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "trigger_type=scheduled" >> $GITHUB_OUTPUT
+          else
+            echo "trigger_type=manual" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger the RDP email workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "RDP email" \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            --field triggered_by="${{ steps.context.outputs.trigger_type }}"
