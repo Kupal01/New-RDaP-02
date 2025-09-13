@@ -2,8 +2,8 @@ name: RDP email
 
 on:
   workflow_dispatch:
-    inputs:                                  # ✅ Added: allow passing inputs when triggered
-      triggered_by:                          # ✅ Added: new input for manual/scheduled info
+    inputs:
+      triggered_by:
         description: "How this workflow was triggered (manual or scheduled)"
         required: false
         default: "manual"
@@ -23,34 +23,31 @@ jobs:
         with:
           path: C:\RDPTools
           key: rdp-tools-v1
+
       # 2️⃣ Create folder and add your files (only runs if cache empty)
       - name: Prepare RDP files
         run: |
           if (!(Test-Path "C:\RDPTools")) {
               New-Item -ItemType Directory -Path C:\RDPTools
           }
-      
-          # Step 2: Define hash function
-          - name: Define Hash Function
-            run: |
-              @'
-          function Get-Hash($input) {
-          $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
-          $sha = [System.Security.Cryptography.SHA256]::Create()
-          $hash = $sha.ComputeHash($bytes)
-          return [BitConverter]::ToString($hash) -replace "-", ""
-          }
-          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
-          
-                # =====================
-      # Added: log input for debugging
-      # =====================
-      - name: Log trigger type
-        run: echo "Triggered by ${{ github.event.inputs.triggered_by }}"   # ✅ Added step
 
-      # =====================
-      # 1. Install Apps (only if missing)
-      # =====================
+      # Step 2: Define hash function
+      - name: Define Hash Function
+        run: |
+          @'
+function Get-Hash($input) {
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
+$sha = [System.Security.Cryptography.SHA256]::Create()
+$hash = $sha.ComputeHash($bytes)
+return [BitConverter]::ToString($hash) -replace "-", ""
+}
+'@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
+
+      # Log trigger type
+      - name: Log trigger type
+        run: echo "Triggered by ${{ github.event.inputs.triggered_by }}"
+
+      # Install Brave if missing
       - name: Install Brave
         run: |
           if (-not (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe")) {
@@ -58,7 +55,7 @@ jobs:
               Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
 
-      # 3️⃣ Upload to artifact (so you can download manually anytime)
+      # Upload RDP files as artifact
       - name: Upload RDP files as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -162,10 +159,10 @@ Password: $password
           Send-RdpEmail $currentIP $rdpPassword
 
           # Run health check loop for 5 hours only
-          $endTime = (Get-Date).AddMinutes(5)  # 5h50m
+          $endTime = (Get-Date).AddMinutes(5)
 
           while ((Get-Date) -lt $endTime) {
-              Start-Sleep -Seconds 300  # every 5 min
+              Start-Sleep -Seconds 300
               $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
               
               if ($newIP -and $newIP -ne $currentIP) {
