@@ -157,20 +157,17 @@ jobs:
               $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
               $smtpClient.EnableSsl = $true
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
- 
-              # You also need to define $body before sending (didn’t see it above)
+          
               $body = @"
-          === RDP ACCESS ===
-          Address: $ip
-          Username: RDP
-          Password: $password
-          ==================
-          "@
-
-
+=== RDP ACCESS ===
+Address: $ip
+Username: RDP
+Password: $password
+==================
+"@
+          
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
-          
           }
           $rdpPassword = "${{ steps.creds.outputs.password }}"
           $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
@@ -194,7 +191,8 @@ jobs:
               } else {
                   Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
               }
-          }          Write-Host "⏰ Health check window ended — moving to rerun step"
+          }       
+          Write-Host "⏰ Health check window ended — moving to rerun step"
 
       - name: Trigger Call RDP email rerun
         if: always()
