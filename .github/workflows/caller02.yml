@@ -42,4 +42,5 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "🔁 Rerunning workflow run ID: ${{ steps.last_run.outputs.last_run_id }}"
-          gh run rerun ${{ steps.last_run.outputs.last_run_id }}
+          gh run rerun ${{ steps.last_run.outputs.last_run_id }} --repo "${{ github.repository }}"
+
