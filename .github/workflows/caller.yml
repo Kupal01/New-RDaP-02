@@ -6,7 +6,7 @@ on:
     - cron: "50 */6 * * *"   # every 6 hours at minute 50 (≈ 5h50m cycle, UTC)
 
 permissions:
-  workflows: write
+  actions: write
   contents: read
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Trigger the RDP email workflow
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           gh workflow run "RDP email" \
             --repo "${{ github.repository }}" \
