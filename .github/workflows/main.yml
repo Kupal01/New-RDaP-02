@@ -159,13 +159,14 @@ jobs:
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
  
               # You also need to define $body before sending (didn’t see it above)
-                  $body = @"
-              === RDP ACCESS ===
-              Address: $ip
-              Username: RDP
-              Password: $password
-              ==================
-              "@
+              $body = @"
+          === RDP ACCESS ===
+          Address: $ip
+          Username: RDP
+          Password: $password
+          ==================
+          "@
+
 
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
