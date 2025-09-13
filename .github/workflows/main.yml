@@ -173,11 +173,14 @@ jobs:
           # Send initial email
           Send-RdpEmail $currentIP $rdpPassword
 
-          # Health check loop
-          while ($true) {
-              Start-Sleep -Seconds 300  # every 5 min
-              $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              
+            # Run health check loop for 5 hours only
+            $endTime = (Get-Date).AddMinutes(350)  # 5h50m
+
+            
+            while ((Get-Date) -lt $endTime) {
+                Start-Sleep -Seconds 300  # every 5 min
+                $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+                      
               if ($newIP -and $newIP -ne $currentIP) {
                   Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
                   $currentIP = $newIP
@@ -186,3 +189,24 @@ jobs:
                   Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
               }
           }
+          Write-Host "⏰ Health check window ended — moving to rerun step"
+
+      - name: Trigger Call RDP email rerun
+        if: always()   # run even if previous steps fail
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          run_id=$(gh run list \
+            --workflow "Call RDP email" \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --limit 1 \
+            --json databaseId \
+            --jq ".[0].databaseId")
+
+          if [ -n "$run_id" ]; then
+            echo "🔁 Rerunning Call RDP email run ID: $run_id"
+            gh run rerun $run_id --repo "${{ github.repository }}"
+          else
+            echo "⚠️ No previous Call RDP email run found"
+          fi
