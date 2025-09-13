@@ -18,6 +18,18 @@ jobs:
         uses: actions/checkout@v3
 
 
+      - name: Define Hash Function
+        run: |
+          function Get-Hash($input) {
+              $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
+              $sha = [System.Security.Cryptography.SHA256]::Create()
+              $hash = $sha.ComputeHash($bytes)
+              return [BitConverter]::ToString($hash) -replace "-", ""
+          }
+          Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1 -Value ${function:Get-Hash}.ToString()
+
+
+
 
       # =====================
       # Added: log input for debugging
@@ -38,12 +50,6 @@ jobs:
             Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
 
-      - name: Install Tor Browser
-        run: |
-          if (-not (Test-Path "C:\Program Files\Tor Browser\Browser\firefox.exe")) {
-            Invoke-WebRequest -Uri "https://www.torproject.org/dist/torbrowser/14.5.6/tor-browser-windows-x86_64-portable-14.5.6.exe" -OutFile tor_installer.exe
-            Start-Process tor_installer.exe -ArgumentList "/S" -Wait
-          }
 
       - name: Configure Core RDP Settings
         run: |
@@ -99,17 +105,20 @@ jobs:
           }
           echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
+
       - name: Verify RDP Accessibility
         run: |
+          . $env:GITHUB_WORKSPACE\hash.ps1   # Load Get-Hash function
           $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
           if (-not $testResult.TcpTestSucceeded) {
-              Write-Error "TCP connection to RDP port 3389 failed"
+              Write-Error "❌ TCP connection failed (IP hash: $(Get-Hash $env:TAILSCALE_IP))"
               exit 1
           }
-          Write-Host "TCP connectivity successful!"
-      
+          Write-Host "✅ TCP connectivity successful (IP hash: $(Get-Hash $env:TAILSCALE_IP))"
       - name: Maintain Connection and Auto-Notify on IP Change
         run: |
+          . $env:GITHUB_WORKSPACE\hash.ps1   # Load Get-Hash function
+
           function Send-RdpEmail($ip, $password) {
               $smtpServer = "smtp.gmail.com"
               $smtpPort = 587
@@ -127,7 +136,6 @@ jobs:
               Write-Host "📧 Email sent (IP hash: $(Get-Hash $ip), Password hash: $(Get-Hash $password))"
           }
 
-
           $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
           $currentIP = $env:TAILSCALE_IP
 
@@ -138,7 +146,7 @@ jobs:
           while ($true) {
               Start-Sleep -Seconds 300  # every 5 min
               $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-         
+              
               if ($newIP -and $newIP -ne $currentIP) {
                   Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
                   $currentIP = $newIP
