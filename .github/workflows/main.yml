@@ -116,11 +116,7 @@ jobs:
           Write-Host "Sending email from $emailFrom to $emailTo using $smtpServer..."
           $smtpClient.Send($mailMessage)
         
-          # Start background job to re-trigger workflow ~10 min before timeout
-          Start-Job {
-            Start-Sleep -Seconds (60 * 350)  # ~5h50m
-            gh workflow run "RDP email" --repo "$env:GITHUB_REPOSITORY"
-          }
+
 
           # Keep runner alive
           while ($true) {
