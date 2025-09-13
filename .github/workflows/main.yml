@@ -17,15 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-name: RDP email
 
-on:
-  workflow_dispatch:
-    inputs:                                  # ✅ Added: allow passing inputs when triggered
-      triggered_by:                          # ✅ Added: new input for manual/scheduled info
-        description: "How this workflow was triggered (manual or scheduled)"
-        required: false
-        default: "manual"
 
       # =====================
       # Added: log input for debugging
