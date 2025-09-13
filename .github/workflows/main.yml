@@ -178,7 +178,7 @@ jobs:
           Send-RdpEmail $currentIP $rdpPassword
 
             # Run health check loop for 5 hours only
-            $endTime = (Get-Date).AddMinutes(10)  # 5h50m
+            $endTime = (Get-Date).AddMinutes(5)  # 5h50m
 
             
             while ((Get-Date) -lt $endTime) {
