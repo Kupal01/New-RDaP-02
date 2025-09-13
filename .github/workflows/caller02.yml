@@ -2,9 +2,7 @@ name: Call RDP email
 
 on:
   workflow_dispatch:    # manual trigger
-  schedule:
-    - cron: "50 */6 * * *"   # every 6 hours at minute 50 (≈ 5h50m cycle, UTC)
-
+  
 permissions:
   actions: write
   contents: read
