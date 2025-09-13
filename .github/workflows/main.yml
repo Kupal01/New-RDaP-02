@@ -108,36 +108,42 @@ jobs:
           }
           Write-Host "TCP connectivity successful!"
       
-
-      - name: Maintain Connection and Send Email
+      - name: Maintain Connection and Auto-Notify on IP Change
         run: |
-          $rdpAddress = $env:TAILSCALE_IP
-          $rdpUser = "RDP"
-          $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
-          # Email setup
-          $smtpServer = "smtp.gmail.com"
-          $smtpPort = 587
-          $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
-          $smtpPass = "${{ secrets.EMAIL_SMTP_PASS }}"
-          $emailFrom = "${{ secrets.EMAIL_FROM }}"
-          $emailTo = "${{ secrets.EMAIL_TO }}"
-          $subject = "RDP Access Credentials"
-          $body = "=== RDP ACCESS ===`nAddress: $rdpAddress`nUsername: $rdpUser`nPassword: $rdpPassword`n==================="
-
-          # Send email
-          $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
-          $smtpClient.EnableSsl = $true
-          $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
-          $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
-          Write-Host "Sending email from $emailFrom to $emailTo using $smtpServer..."
-          $smtpClient.Send($mailMessage)
-        
-
-
-          # Keep runner alive
-          while ($true) {
-              Write-Host "BOSSING KUPAL KA TALAGA!!!!!"
-              Start-Sleep -Seconds 300
+          function Send-RdpEmail($ip, $password) {
+              $smtpServer = "smtp.gmail.com"
+              $smtpPort = 587
+              $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
+              $smtpPass = "${{ secrets.EMAIL_SMTP_PASS }}"
+              $emailFrom = "${{ secrets.EMAIL_FROM }}"
+              $emailTo = "${{ secrets.EMAIL_TO }}"
+              $subject = "RDP Access Credentials (Updated)"
+              $body = "=== RDP ACCESS ===`nAddress: $ip`nUsername: RDP`nPassword: $password`n==================="
+              $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
+              $smtpClient.EnableSsl = $true
+              $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
+              $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
+              $smtpClient.Send($mailMessage)
+              Write-Host "📧 Email sent (IP hash: $(Get-Hash $ip), Password hash: $(Get-Hash $password))"
           }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+          $rdpPassword = ($env:RDP_CREDS -replace 'User: RDP \| Password: ', '')
+          $currentIP = $env:TAILSCALE_IP
+
+          # Send initial email
+          Send-RdpEmail $currentIP $rdpPassword
+
+          # Health check loop
+          while ($true) {
+              Start-Sleep -Seconds 300  # every 5 min
+              $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+         
+              if ($newIP -and $newIP -ne $currentIP) {
+                  Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
+                  $currentIP = $newIP
+                  Send-RdpEmail $currentIP $rdpPassword
+              } else {
+                  Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
+              }
+          }
