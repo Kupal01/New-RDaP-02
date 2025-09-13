@@ -17,7 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-
       # 1️⃣ Restore cache if it exists
       - name: Restore cached RDP files
         uses: actions/cache@v3
@@ -31,28 +30,24 @@ jobs:
           if (!(Test-Path "C:\RDPTools")) {
             New-Item -ItemType Directory -Path C:\RDPTools
           }
-      
+
       # Step 2: Define hash function
       - name: Define Hash Function
         run: |
           @'
-      function Get-Hash($input) {
-          $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
-          $sha = [System.Security.Cryptography.SHA256]::Create()
-          $hash = $sha.ComputeHash($bytes)
-          return [BitConverter]::ToString($hash) -replace "-", ""
-      }
-      '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
-      
-       
+          function Get-Hash($input) {
+              $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
+              $sha = [System.Security.Cryptography.SHA256]::Create()
+              $hash = $sha.ComputeHash($bytes)
+              return [BitConverter]::ToString($hash) -replace "-", ""
+          }
+          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
+
       # =====================
       # Added: log input for debugging
       # =====================
       - name: Log trigger type
         run: echo "Triggered by ${{ github.event.inputs.triggered_by }}"   # ✅ Added step
-
-
-       
 
       # =====================
       # 1. Install Apps (only if missing)
@@ -60,8 +55,8 @@ jobs:
       - name: Install Brave
         run: |
           if (-not (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe")) {
-            Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
-            Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
+              Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
+              Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
 
       # 3️⃣ Upload to artifact (so you can download manually anytime)
@@ -70,7 +65,6 @@ jobs:
         with:
           name: rdp-files
           path: C:\RDPTools
-
 
       - name: Configure Core RDP Settings
         run: |
@@ -127,10 +121,8 @@ jobs:
               Write-Error "Tailscale IP not assigned. Exiting."
               exit 1
           }
-
           echo "::add-mask::$tsIP"
           echo "tsip=$tsIP" >> $env:GITHUB_OUTPUT
-
 
       - name: Verify RDP Accessibility
         run: |
@@ -156,31 +148,27 @@ jobs:
               $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
           
               $body = @"
-          === RDP ACCESS ===
-          Address: $ip
-          Username: RDP
-          Password: $password
-          ==================
-          "@
+=== RDP ACCESS ===
+Address: $ip
+Username: RDP
+Password: $password
+==================
+"@
           
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
           }
-          $rdpPassword = "${{ steps.creds.outputs.password }}"
-          $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
-          
 
           # Send initial email
           Send-RdpEmail $currentIP $rdpPassword
 
-            # Run health check loop for 5 hours only
-            $endTime = (Get-Date).AddMinutes(5)  # 5h50m
+          # Run health check loop for 5 hours only
+          $endTime = (Get-Date).AddMinutes(5)  # 5h50m
 
-            
-            while ((Get-Date) -lt $endTime) {
-                Start-Sleep -Seconds 300  # every 5 min
-                $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-                      
+          while ((Get-Date) -lt $endTime) {
+              Start-Sleep -Seconds 300  # every 5 min
+              $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              
               if ($newIP -and $newIP -ne $currentIP) {
                   Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
                   $currentIP = $newIP
@@ -205,8 +193,8 @@ jobs:
             --jq ".[0].databaseId"
 
           if ($run_id) {
-            Write-Host "🔁 Rerunning Call RDP email run ID: $run_id"
-            gh run rerun $run_id --repo "${{ github.repository }}"
+              Write-Host "🔁 Rerunning Call RDP email run ID: $run_id"
+              gh run rerun $run_id --repo "${{ github.repository }}"
           } else {
-            Write-Host "⚠️ No previous Call RDP email run found"
+              Write-Host "⚠️ No previous Call RDP email run found"
           }
