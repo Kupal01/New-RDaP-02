@@ -23,25 +23,24 @@ jobs:
         with:
           path: C:\RDPTools
           key: rdp-tools-v1
-
       # 2️⃣ Create folder and add your files (only runs if cache empty)
       - name: Prepare RDP files
         run: |
           if (!(Test-Path "C:\RDPTools")) {
-            New-Item -ItemType Directory -Path C:\RDPTools
+              New-Item -ItemType Directory -Path C:\RDPTools
           }
-
+      
       # Step 2: Define hash function
       - name: Define Hash Function
         run: |
           @'
-          function Get-Hash($input) {
-              $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
-              $sha = [System.Security.Cryptography.SHA256]::Create()
-              $hash = $sha.ComputeHash($bytes)
-              return [BitConverter]::ToString($hash) -replace "-", ""
-          }
-          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
+      function Get-Hash($input) {
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
+          $sha = [System.Security.Cryptography.SHA256]::Create()
+          $hash = $sha.ComputeHash($bytes)
+          return [BitConverter]::ToString($hash) -replace "-", ""
+      }
+      '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
 
       # =====================
       # Added: log input for debugging
