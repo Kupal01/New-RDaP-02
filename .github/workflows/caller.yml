@@ -3,7 +3,7 @@ name: Call RDP email
 on:
   workflow_dispatch:    # manual trigger
   schedule:
-    - cron: "50 */6 * * *"   # every 6 hours at minute 50 (≈ 5h50m cycle, UTC)
+    - cron: "00 */6 * * *"   # every 6 hours at minute 00 
 
 permissions:
   actions: write
@@ -22,11 +22,24 @@ jobs:
             echo "trigger_type=manual" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger the RDP email workflow
+      - name: Get last run ID of RDP email
+        id: last_run
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          gh workflow run "RDP email" \
-            --repo "${{ github.repository }}" \
-            --ref "${{ github.ref_name }}" \
-            --field triggered_by="${{ steps.context.outputs.trigger_type }}"
+          run_id=$(gh run list \
+            --workflow "RDP email" \
+            --branch "${{ github.ref_name }}" \
+            --limit 1 \
+            --json databaseId \
+            --jq ".[0].databaseId")
+
+          echo "last_run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Rerun last RDP email workflow
+        if: steps.last_run.outputs.last_run_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          echo "🔁 Rerunning workflow run ID: ${{ steps.last_run.outputs.last_run_id }}"
+          gh run rerun ${{ steps.last_run.outputs.last_run_id }}
