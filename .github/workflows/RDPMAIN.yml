@@ -27,6 +27,21 @@ jobs:
               Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
 
+      # Install Android Studio if missing
+      - name: Install Android Studio
+        run: |
+          $studioPath = "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+          if (-not (Test-Path $studioPath)) {
+              $installerUrl = "https://r1---sn-jvhja5g3-hoay.gvt1.com/edgedl/android/studio/install/2025.1.3.7/android-studio-2025.1.3.7-windows.exe?cms_redirect=yes&met=1759491529,&mh=rM&mip=136.158.26.243&mm=28&mn=sn-jvhja5g3-hoay&ms=nvh&mt=1759491377&mv=m&mvi=1&pl=22&rms=nvh,nvh&shardbypass=sd"
+              $installerFile = "$env:TEMP\android-studio-installer.exe"
+              Invoke-WebRequest -Uri $installerUrl -OutFile $installerFile
+              Start-Process $installerFile -ArgumentList "/S" -Wait
+              Remove-Item $installerFile -Force
+          }
+
+  
+
+
       # Upload to artifact (manual download if needed)
       - name: Upload RDP files as artifact
         uses: actions/upload-artifact@v4
@@ -125,8 +140,9 @@ jobs:
               Write-Host "Failed to send email: $_"
           }
 
-      # Uninstall specific large apps
+      # Uninstall specific large apps (registry-based method)
       - name: Uninstall Specific Large Apps
+        shell: pwsh
         run: |
           $appsToRemove = @(
             "Rtools 4.5 (6608-6492)",
@@ -136,16 +152,33 @@ jobs:
             "Strawberry Perl (64-bit)"
           )
 
+          $registryPaths = @(
+            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+          )
+
           foreach ($appName in $appsToRemove) {
-              $app = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$appName*" }
-              if ($app) {
-                  Write-Host "Uninstalling $($app.Name) ($([math]::Round(($app.InstallDate),2)))"
-                  $app.Uninstall() | Out-Null
-              } else {
+              $found = $false
+              foreach ($regPath in $registryPaths) {
+                  $app = Get-ItemProperty $regPath -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like "$appName*" }
+                  if ($app) {
+                      Write-Host "Uninstalling $($app.DisplayName)"
+                      if ($app.UninstallString) {
+                          $uninstallCmd = $app.UninstallString
+                          if ($uninstallCmd -match "msiexec\.exe" -and $uninstallCmd -match "/I") {
+                              $uninstallCmd = $uninstallCmd -replace "/I", "/X"
+                          }
+                          Start-Process cmd.exe "/c $uninstallCmd /quiet /norestart" -Wait
+                          Write-Host "Uninstalled: $($app.DisplayName)"
+                          $found = $true
+                          break
+                      }
+                  }
+              }
+              if (-not $found) {
                   Write-Host "App not found: $appName"
               }
           }
-
 
       - name: Keep runner alive
         run: |
@@ -154,4 +187,3 @@ jobs:
               Start-Sleep -Seconds 600
               Write-Host "Runner: $(Get-Date)"
           }
-          
