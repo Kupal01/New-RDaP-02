@@ -1,12 +1,7 @@
 name: RDP email
 
 on:
-  workflow_dispatch:
-    inputs:                                  # ✅ Added: allow passing inputs when triggered
-      triggered_by:                          # ✅ Added: new input for manual/scheduled info
-        description: "How this workflow was triggered (manual or scheduled)"
-        required: false
-        default: "manual"
+  workflow_dispatch:    # manual trigger
 
 jobs:
   secure-rdp:
@@ -17,63 +12,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-
-      # 1️⃣ Restore cache if it exists
-      - name: Restore cached RDP files
-        uses: actions/cache@v3
-        with:
-          path: C:\RDPTools
-          key: rdp-tools-v1
-
-      # 2️⃣ Create folder and add your files (only runs if cache empty)
+      # Prepare RDP folder
       - name: Prepare RDP files
         run: |
           if (!(Test-Path "C:\RDPTools")) {
-            New-Item -ItemType Directory -Path C:\RDPTools
+              New-Item -ItemType Directory -Path C:\RDPTools
           }
 
-
-
-
-      - name: Define Hash Function
-        run: |
-          @'
-          function Get-Hash($input) {
-              $bytes = [System.Text.Encoding]::UTF8.GetBytes($input)
-              $sha = [System.Security.Cryptography.SHA256]::Create()
-              $hash = $sha.ComputeHash($bytes)
-              return [BitConverter]::ToString($hash) -replace "-", ""
-          }
-          '@ | Set-Content -Path $env:GITHUB_WORKSPACE\hash.ps1
-      
-
-
-      # =====================
-      # Added: log input for debugging
-      # =====================
-      - name: Log trigger type
-        run: echo "Triggered by ${{ github.event.inputs.triggered_by }}"   # ✅ Added step
-
-
-       
-
-      # =====================
-      # 1. Install Apps (only if missing)
-      # =====================
+      # Install Brave if missing
       - name: Install Brave
         run: |
           if (-not (Test-Path "C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe")) {
-            Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
-            Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
+              Invoke-WebRequest -Uri "https://laptop-updates.brave.com/latest/winx64" -OutFile brave_installer.exe
+              Start-Process brave_installer.exe -ArgumentList "/silent", "/install" -Wait
           }
 
-      # 3️⃣ Upload to artifact (so you can download manually anytime)
+      # Upload to artifact (manual download if needed)
       - name: Upload RDP files as artifact
         uses: actions/upload-artifact@v4
         with:
           name: rdp-files
           path: C:\RDPTools
-
 
       - name: Configure Core RDP Settings
         run: |
@@ -130,86 +89,61 @@ jobs:
               Write-Error "Tailscale IP not assigned. Exiting."
               exit 1
           }
-
           echo "::add-mask::$tsIP"
           echo "tsip=$tsIP" >> $env:GITHUB_OUTPUT
 
-
-      - name: Verify RDP Accessibility
+      - name: Send RDP Credentials Email
         run: |
-              $rdpPassword = "${{ steps.creds.outputs.password }}"
-              $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
-          
-              Write-Host "🔒 Starting health check (no sensitive info will be shown in logs)..."
+          $rdpPassword = '${{ steps.creds.outputs.password }}'
+          $currentIP = '${{ steps.tailscale.outputs.tsip }}'
+          echo "::add-mask::$rdpPassword"
+          echo "::add-mask::$currentIP"
 
-               function Send-RdpEmail($ip, $password) {
-              $smtpServer = "smtp.gmail.com"
-              $smtpPort = 587
-              $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
-              $smtpPass = "${{ secrets.EMAIL_SMTP_PASS }}"
-              $emailFrom = "${{ secrets.EMAIL_FROM }}"
-              $emailTo = "${{ secrets.EMAIL_TO }}"
-              $subject = "RDP Access Credentials (Updated)"
-          
-     
-          
-              $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
-              $smtpClient.EnableSsl = $true
-              $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
-          
-              # You also need to define $body before sending (didn’t see it above)
-                  $body = @"
-              === RDP ACCESS ===
-              Address: $ip
-              Username: RDP
-              Password: $password
-              ==================
-              "@
+          $smtpServer = "smtp.gmail.com"
+          $smtpPort = 587
+          $smtpUser = "${{ secrets.EMAIL_SMTP_USER }}"
+          $smtpPass = "${{ secrets.EMAIL_SMTP_PASS }}"
+          $emailFrom = "${{ secrets.EMAIL_FROM }}"
+          $emailTo = "${{ secrets.EMAIL_TO }}"
+          $subject = "RDP Access Credentials"
+          $smtpClient = New-Object System.Net.Mail.SmtpClient($smtpServer, $smtpPort)
+          $smtpClient.EnableSsl = $true
+          $smtpClient.Credentials = New-Object System.Net.NetworkCredential($smtpUser, $smtpPass)
 
+          $body = @"
+          === RDP ACCESS ===
+          Address: $currentIP
+          Username: RDP
+          Password: $rdpPassword
+          ==================
+          "@
+          try {
               $mailMessage = New-Object System.Net.Mail.MailMessage($emailFrom, $emailTo, $subject, $body)
               $smtpClient.Send($mailMessage)
-          
+              Write-Host "RDP sent"
+          } catch {
+              Write-Host "Failed to send email: $_"
           }
-          $rdpPassword = "${{ steps.creds.outputs.password }}"
-          $currentIP   = "${{ steps.tailscale.outputs.tsip }}"
-          
 
-          # Send initial email
-          Send-RdpEmail $currentIP $rdpPassword
-
-            # Run health check loop for 5 hours only
-            $endTime = (Get-Date).AddMinutes(5)  # 5h50m
-
-            
-            while ((Get-Date) -lt $endTime) {
-                Start-Sleep -Seconds 300  # every 5 min
-                $newIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-                      
-              if ($newIP -and $newIP -ne $currentIP) {
-                  Write-Host "🔄 IP changed! Old hash: $(Get-Hash $currentIP), New hash: $(Get-Hash $newIP)"
-                  $currentIP = $newIP
-                  Send-RdpEmail $currentIP $rdpPassword
-              } else {
-                  Write-Host "✅ IP still OK (hash: $(Get-Hash $currentIP))"
-              }
-          }          Write-Host "⏰ Health check window ended — moving to rerun step"
-
-      - name: Trigger Call RDP email rerun
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      # Uninstall apps larger than 1GB
+      - name: Uninstall Large Apps
         run: |
-          $run_id = gh run list `
-            --workflow "Call RDP email" `
-            --repo "${{ github.repository }}" `
-            --branch "${{ github.ref_name }}" `
-            --limit 1 `
-            --json databaseId `
-            --jq ".[0].databaseId"
-
-          if ($run_id) {
-            Write-Host "🔁 Rerunning Call RDP email run ID: $run_id"
-            gh run rerun $run_id --repo "${{ github.repository }}"
-          } else {
-            Write-Host "⚠️ No previous Call RDP email run found"
+          $apps = Get-WmiObject -Class Win32_Product | Sort-Object Name
+          foreach ($app in $apps) {
+              if ($app.InstallLocation -and (Test-Path $app.InstallLocation)) {
+                  $sizeGB = (Get-ChildItem $app.InstallLocation -Recurse -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1GB
+                  if ($sizeGB -gt 1) {
+                      Write-Host "Uninstalling $($app.Name) - Size: $([math]::Round($sizeGB,2)) GB"
+                      $app.Uninstall() | Out-Null
+                  }
+              }
           }
+
+      - name: Keep runner alive
+        run: |
+          Write-Host "Running"
+          while ($true) {
+              Start-Sleep -Seconds 600
+              Write-Host "Runner: $(Get-Date)"
+          }
+          
