@@ -125,19 +125,27 @@ jobs:
               Write-Host "Failed to send email: $_"
           }
 
-      # Uninstall apps larger than 1GB
-      - name: Uninstall Large Apps
+      # Uninstall specific large apps
+      - name: Uninstall Specific Large Apps
         run: |
-          $apps = Get-WmiObject -Class Win32_Product | Sort-Object Name
-          foreach ($app in $apps) {
-              if ($app.InstallLocation -and (Test-Path $app.InstallLocation)) {
-                  $sizeGB = (Get-ChildItem $app.InstallLocation -Recurse -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1GB
-                  if ($sizeGB -gt 1) {
-                      Write-Host "Uninstalling $($app.Name) - Size: $([math]::Round($sizeGB,2)) GB"
-                      $app.Uninstall() | Out-Null
-                  }
+          $appsToRemove = @(
+            "Rtools 4.5 (6608-6492)",
+            "Azure Cosmos DB Emulator",
+            "MongoDB 7.0.23 2008R2Plus SSL (64 bit)",
+            "PostgreSQL 17",
+            "Strawberry Perl (64-bit)"
+          )
+
+          foreach ($appName in $appsToRemove) {
+              $app = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$appName*" }
+              if ($app) {
+                  Write-Host "Uninstalling $($app.Name) ($([math]::Round(($app.InstallDate),2)))"
+                  $app.Uninstall() | Out-Null
+              } else {
+                  Write-Host "App not found: $appName"
               }
           }
+
 
       - name: Keep runner alive
         run: |
