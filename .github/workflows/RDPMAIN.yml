@@ -12,13 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Prepare RDP folder
-      - name: Prepare RDP files
-        run: |
-          if (!(Test-Path "C:\RDPTools")) {
-              New-Item -ItemType Directory -Path C:\RDPTools
-          }
-
+      
       # Install Brave if missing
       - name: Install Brave
         run: |
@@ -140,46 +134,7 @@ jobs:
               Write-Host "Failed to send email: $_"
           }
 
-      # Uninstall specific large apps (registry-based method)
-      - name: Uninstall Specific Large Apps
-        shell: pwsh
-        run: |
-          $appsToRemove = @(
-            "Rtools 4.5 (6608-6492)",
-            "Azure Cosmos DB Emulator",
-            "MongoDB 7.0.23 2008R2Plus SSL (64 bit)",
-            "PostgreSQL 17",
-            "Strawberry Perl (64-bit)"
-          )
-
-          $registryPaths = @(
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
-          )
-
-          foreach ($appName in $appsToRemove) {
-              $found = $false
-              foreach ($regPath in $registryPaths) {
-                  $app = Get-ItemProperty $regPath -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like "$appName*" }
-                  if ($app) {
-                      Write-Host "Uninstalling $($app.DisplayName)"
-                      if ($app.UninstallString) {
-                          $uninstallCmd = $app.UninstallString
-                          if ($uninstallCmd -match "msiexec\.exe" -and $uninstallCmd -match "/I") {
-                              $uninstallCmd = $uninstallCmd -replace "/I", "/X"
-                          }
-                          Start-Process cmd.exe "/c $uninstallCmd /quiet /norestart" -Wait
-                          Write-Host "Uninstalled: $($app.DisplayName)"
-                          $found = $true
-                          break
-                      }
-                  }
-              }
-              if (-not $found) {
-                  Write-Host "App not found: $appName"
-              }
-          }
-
+      
       - name: Keep runner alive
         run: |
           Write-Host "Running"
